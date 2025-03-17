@@ -55,12 +55,21 @@ class DEResult:
         var_col: str | None = None,
     ) -> None:
         self.res = res
-        self.p_col = p_col
         self.layer = layer
         self.adata = adata
+
+        self.p_col = p_col
         self.effect_size_col = effect_size_col
         self.contrast_col = contrast_col
         self.var_col = var_col
+
+        for col in ["p_col", "effect_size_col", "contrast_col", "var_col"]:
+            if col not in self.res.columns:
+                raise ValueError(f"Column {col} does not exist in the results data frame!")
+
+        for col in ["p_col", "effect_size_col"]:
+            if not np.issubdtype(self.res[col].dtype, np.number):
+                raise ValueError(f"Column {col} must be numeric!")
 
     @property
     def contrasts(self) -> list | None:
@@ -90,9 +99,9 @@ class DEResult:
         except ImportError:
             raise ImportError(
                 "FDR correction requires statsmodels to be installed: run `!pip install statsmodels` and try again!"
-            ) from none
+            ) from None
 
-        self.res[adj_col_name] = statsmodels.stats.multitest.fdrcorrection(self.res[self.p_col])
+        self.res[adj_col_name] = statsmodels.stats.multitest.fdrcorrection(self.res[self.p_col])[1]
         self.p_col = adj_col_name
 
     @property
