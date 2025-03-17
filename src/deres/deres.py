@@ -830,7 +830,6 @@ class DEResult:
         self,
         *,
         n_top_vars=15,
-        contrast_col: str = "contrast",
         marker_size: int = 100,
         figsize: tuple[int, int] = (10, 2),
         x_label: str = "Contrast",
@@ -840,50 +839,52 @@ class DEResult:
     ) -> Figure | None:
         """Plot a matrix of log2 fold changes from the results.
 
-        Args:
-            results_df: DataFrame with results from DE analysis.
-            n_top_vars: Number of top variables to plot per group.
-            contrast_col: Column in results_df containing information about the contrast.
-            log2fc_col: Column in results_df containing the log2 fold change.
-            self.p_col: Column in results_df containing the p-value. Can be used to switch between adjusted and unadjusted p-values.
-            symbol_col: Column in results_df containing the gene symbol.
-            marker_size: Size of the biggest marker for significant variables.
-            figsize: Size of the figure.
-            x_label: Label for the x-axis.
-            y_label: Label for the y-axis.
-            {common_plot_args}
-            **heatmap_kwargs: Additional arguments for seaborn.heatmap.
+        Parameters
+        ----------
+        n_top_vars
+            Number of top variables to plot per group. Default: 15.
+        marker_size
+            Size of the biggest marker for significant variables. Default: 100.
+        figsize
+            Size of the figure. Default: (10, 2).
+        x_label
+            Label for the x-axis. Default: "Contrast".
+        y_label
+            Label for the y-axis. Default: "Gene".
+        return_fig
+            If True, return the figure, otherwise None. Default: False.
+        **heatmap_kwargs
+            Additional arguments for seaborn.heatmap.
 
         Returns
         -------
-            If `return_fig` is `True`, returns the figure, otherwise `None`.
+        If `return_fig` is `True`, returns the figure, otherwise `None`.
 
         Examples
         --------
-            >>> # Example with EdgeR
-            >>> import pertpy as pt
-            >>> adata = pt.dt.zhang_2021()
-            >>> adata.layers["counts"] = adata.X.copy()
-            >>> ps = pt.tl.PseudobulkSpace()
-            >>> pdata = ps.compute(
-            ...     adata,
-            ...     target_col="Patient",
-            ...     groups_col="Cluster",
-            ...     layer_key="counts",
-            ...     mode="sum",
-            ...     min_cells=10,
-            ...     min_counts=1000,
-            ... )
-            >>> edgr = pt.tl.EdgeR(pdata, design="~Efficacy+Treatment")
-            >>> res_df = edgr.compare_groups(pdata, column="Efficacy", baseline="SD", groups_to_compare=["PR", "PD"])
-            >>> edgr.plot_multicomparison_fc(res_df)
+        >>> # Example with EdgeR
+        >>> import pertpy as pt
+        >>> adata = pt.dt.zhang_2021()
+        >>> adata.layers["counts"] = adata.X.copy()
+        >>> ps = pt.tl.PseudobulkSpace()
+        >>> pdata = ps.compute(
+        ...     adata,
+        ...     target_col="Patient",
+        ...     groups_col="Cluster",
+        ...     layer_key="counts",
+        ...     mode="sum",
+        ...     min_cells=10,
+        ...     min_counts=1000,
+        ... )
+        >>> edgr = pt.tl.EdgeR(pdata, design="~Efficacy+Treatment")
+        >>> res_df = edgr.compare_groups(pdata, column="Efficacy", baseline="SD", groups_to_compare=["PR", "PD"])
+        >>> edgr.plot_multicomparison_fc(res_df)
 
         Preview:
             .. image:: /_static/docstring_previews/de_multicomparison_fc.png
         """
-        groups = results_df[contrast_col].unique().tolist()
-
-        results_df["abs_log_fc"] = results_df[log2fc_col].abs()
+        if self.contrasts is None:
+            raise ValueError("The multicomparison plot requires the contrasts column to be set.")
 
         def _get_significance(p_val):
             if p_val < 0.001:
@@ -895,19 +896,20 @@ class DEResult:
             else:
                 return "n.s."
 
+        results_df = self.get_df()
+        results_df["abs_log_fc"] = results_df[self.effect_size_col].abs()
         results_df["significance"] = results_df[self.p_col].apply(_get_significance)
 
         var_names = []
-        for group in groups:
-            var_names += (
-                results_df[results_df[contrast_col] == group]
+        for contr in self.contrasts:
+            var_names.extend(
+                results_df[results_df[self.contrast_col] == contr]
                 .sort_values("abs_log_fc", ascending=False)
-                .head(n_top_vars)[symbol_col]
-                .tolist()
+                .head(n_top_vars)[self.var_col]
             )
 
-        results_df = results_df[results_df[symbol_col].isin(var_names)]
-        df = results_df.pivot(index=contrast_col, columns=symbol_col, values=log2fc_col)[var_names]
+        results_df = results_df[results_df[self.var_col].isin(var_names)]
+        df = results_df.pivot(index=self.contrast_col, columns=self.var_col, values=self.effect_size_col)[var_names]
 
         plt.figure(figsize=figsize)
         sns.heatmap(df, **heatmap_kwargs, cmap="coolwarm", center=0, cbar_kws={"label": "Log2 fold change"})
@@ -919,8 +921,8 @@ class DEResult:
         for _i, row in results_df.iterrows():
             if row["significance"] != "n.s.":
                 plt.scatter(
-                    x=x_locs[x_labels.index(row[symbol_col])],
-                    y=y_locs[y_labels.index(row[contrast_col])],
+                    x=x_locs[x_labels.index(row[self.var_col])],
+                    y=y_locs[y_labels.index(row[self.contrast_col])],
                     s=_size[row["significance"]],
                     marker="*",
                     c="white",
