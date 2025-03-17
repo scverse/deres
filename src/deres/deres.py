@@ -75,6 +75,16 @@ class DEResult:
         else:
             return self.adata.layers[self.layer]
 
+    def summary(self, cutoffs: Sequence[float] = (0.1, 0.05, 0.01, 0.001, 0.0001)) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "total": [np.sum(self.res[self.p_col] < c) for c in cutoffs],
+                "up": [np.sum((self.res[self.p_col] < c) & (self.res[self.effect_size_col] > 0)) for c in cutoffs],
+                "down": [np.sum((self.res[self.p_col] < c) & (self.res[self.effect_size_col] < 0)) for c in cutoffs],
+            },
+            index=[f"p < {c}" for c in cutoffs],
+        )
+
     @_doc_params(common_plot_args=doc_common_plot_args)
     def plot_volcano(
         self,
