@@ -678,12 +678,7 @@ source = { editable = "." }
 dependencies = [
     { name = "anndata" },
     { name = "formulaic" },
-    { name = "ipykernel" },
     { name = "pandas" },
-    { name = "pertpy" },
-    { name = "pydeseq2" },
-    { name = "session-info" },
-    { name = "statsmodels" },
 ]
 
 [package.optional-dependencies]
@@ -698,6 +693,8 @@ doc = [
     { name = "ipython", version = "9.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "myst-nb" },
     { name = "pandas" },
+    { name = "pertpy" },
+    { name = "scanpy" },
     { name = "setuptools" },
     { name = "sphinx", version = "8.1.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "sphinx", version = "8.2.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -708,6 +705,10 @@ doc = [
     { name = "sphinx-tabs" },
     { name = "sphinxcontrib-bibtex" },
     { name = "sphinxext-opengraph" },
+    { name = "statsmodels" },
+]
+stats = [
+    { name = "statsmodels" },
 ]
 test = [
     { name = "coverage" },
@@ -720,17 +721,15 @@ requires-dist = [
     { name = "coverage", marker = "extra == 'test'" },
     { name = "docutils", marker = "extra == 'doc'", specifier = ">=0.8,!=0.18.*,!=0.19.*" },
     { name = "formulaic", specifier = ">=1.1.1" },
-    { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "ipykernel", marker = "extra == 'doc'" },
     { name = "ipython", marker = "extra == 'doc'" },
     { name = "myst-nb", marker = "extra == 'doc'", specifier = ">=1.1" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "pandas", marker = "extra == 'doc'" },
-    { name = "pertpy", directory = "../pertpy" },
+    { name = "pertpy", marker = "extra == 'doc'", directory = "../pertpy" },
     { name = "pre-commit", marker = "extra == 'dev'" },
-    { name = "pydeseq2", specifier = ">=0.5.0" },
     { name = "pytest", marker = "extra == 'test'" },
-    { name = "session-info" },
+    { name = "scanpy", marker = "extra == 'doc'" },
     { name = "setuptools", marker = "extra == 'doc'" },
     { name = "sphinx", marker = "extra == 'doc'", specifier = ">=4" },
     { name = "sphinx-autodoc-typehints", marker = "extra == 'doc'" },
@@ -739,7 +738,8 @@ requires-dist = [
     { name = "sphinx-tabs", marker = "extra == 'doc'" },
     { name = "sphinxcontrib-bibtex", marker = "extra == 'doc'", specifier = ">=1" },
     { name = "sphinxext-opengraph", marker = "extra == 'doc'" },
-    { name = "statsmodels", specifier = ">=0.14.4" },
+    { name = "statsmodels", marker = "extra == 'doc'" },
+    { name = "statsmodels", marker = "extra == 'stats'", specifier = ">=0.14.4" },
     { name = "twine", marker = "extra == 'dev'", specifier = ">=4.0.2" },
 ]
 
@@ -926,20 +926,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5c/30/03b5e3bb62374db3f665ca3020fdfc4304e98ceeaaa9dcd7a47a6b574ebf/formulaic-1.1.1.tar.gz", hash = "sha256:ddf80e4bef976dd99698aa27512015276c7b86c314b601ae6fd360c7741b7231", size = 652602 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d2/c2/a34097e53efe70a538ae97574ff9e9866e60fc1c792c19da5fd6b56ce7b5/formulaic-1.1.1-py3-none-any.whl", hash = "sha256:bbb7e38f99e4bcdc62cb0a6a818ad33b370b4e98e9e4f0b276561448482c8268", size = 115718 },
-]
-
-[[package]]
-name = "formulaic-contrasts"
-version = "1.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "formulaic" },
-    { name = "pandas" },
-    { name = "session-info" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/28/e6/4850976c248746062cfaa08628b3ec5ba3dfcab3d6ecd0d3886c36c04681/formulaic_contrasts-1.0.0.tar.gz", hash = "sha256:0a575a810bf1fba28938259d86a3ae2ae90cb9826fca84b9409085170862f701", size = 123794 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/40/7b/639411281256c84e8111bf6cb9676c44dbf5d8ad4cb042f4359b7e7b9e74/formulaic_contrasts-1.0.0-py3-none-any.whl", hash = "sha256:e1220d315cf446bdec9385375ca4da43896e4ba68114ebea1b2a37efa5d097f5", size = 10054 },
 ]
 
 [[package]]
@@ -3186,25 +3172,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pydeseq2"
-version = "0.5.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "anndata" },
-    { name = "formulaic" },
-    { name = "formulaic-contrasts" },
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "scikit-learn" },
-    { name = "scipy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a1/f4/ec769167b69e4e9267e23563cc60282d1b44ed687609304642cbfb9c1ebc/pydeseq2-0.5.0.tar.gz", hash = "sha256:dec59cee6163c3dc5a333008afc52700c3678e8ebe08583724611110dd8db5bc", size = 51597 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/c6/19/1d442931450c877474b3caf859323b59c841f5125aca4a9bbac2482e5f43/pydeseq2-0.5.0-py3-none-any.whl", hash = "sha256:6cd89bd3bdf48ec62cc0ffca8ca92a4ad59b2ea751be22b1f594ce2a53a58372", size = 46698 },
-]
-
-[[package]]
 name = "pygments"
 version = "2.19.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3880,15 +3847,6 @@ wheels = [
 ]
 
 [[package]]
-name = "session-info"
-version = "1.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "stdlib-list" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/94/e4/ea615bb8185a298b21df1ac52a4a5db4e3351823a218f47ef3f883def88c/session_info-1.0.0.tar.gz", hash = "sha256:3cda5e03cca703f32ae2eadbd6bd80b6c21442cfb60e412c21cb8ad6d5cbb6b7", size = 24345 }
-
-[[package]]
 name = "session-info2"
 version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
@@ -4341,15 +4299,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fe/2a/55c5b5c5e5124a202ea3fe0bcdbdeceaf91b4ec6164b8434acb9dd97409c/statsmodels-0.14.4-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1322286a7bfdde2790bf72d29698a1b76c20b8423a55bdcd0d457969d0041f72", size = 10723228 },
     { url = "https://files.pythonhosted.org/packages/4f/76/67747e49dc758daae06f33aad8247b718cd7d224f091d2cd552681215bb2/statsmodels-0.14.4-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:e31b95ac603415887c9f0d344cb523889cf779bc52d68e27e2d23c358958fec7", size = 10859503 },
     { url = "https://files.pythonhosted.org/packages/1d/eb/cb8b01f5edf8f135eb3d0553d159db113a35b2948d0e51eeb735e7ae09ea/statsmodels-0.14.4-cp313-cp313-win_amd64.whl", hash = "sha256:81030108d27aecc7995cac05aa280cf8c6025f6a6119894eef648997936c2dd0", size = 9817574 },
-]
-
-[[package]]
-name = "stdlib-list"
-version = "0.11.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/5d/09/8d5c564931ae23bef17420a6c72618463a59222ca4291a7dd88de8a0d490/stdlib_list-0.11.1.tar.gz", hash = "sha256:95ebd1d73da9333bba03ccc097f5bac05e3aa03e6822a0c0290f87e1047f1857", size = 60442 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/88/c7/4102536de33c19d090ed2b04e90e7452e2e3dc653cf3323208034eaaca27/stdlib_list-0.11.1-py3-none-any.whl", hash = "sha256:9029ea5e3dfde8cd4294cfd4d1797be56a67fc4693c606181730148c3fd1da29", size = 83620 },
 ]
 
 [[package]]

@@ -1,3 +1,4 @@
+import logging
 import math
 from collections.abc import Sequence
 from itertools import zip_longest
@@ -10,10 +11,10 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from anndata import AnnData
-from lamin_utils import logger
 from matplotlib.pyplot import Figure
 from matplotlib.ticker import MaxNLocator
-from pertpy._doc import _doc_params, doc_common_plot_args
+
+logger = logging.getLogger("deres")
 
 
 class DEResult:
@@ -137,7 +138,6 @@ class DEResult:
             )
         return pd.concat(dfs)
 
-    @_doc_params(common_plot_args=doc_common_plot_args)
     def plot_volcano(
         self,
         contrast: str | None = None,
@@ -540,7 +540,6 @@ class DEResult:
         plt.show()
         return None
 
-    @_doc_params(common_plot_args=doc_common_plot_args)
     def plot_paired(
         self,
         groupby: str,
@@ -747,7 +746,6 @@ class DEResult:
         plt.show()
         return None
 
-    @_doc_params(common_plot_args=doc_common_plot_args)
     def plot_fold_change(
         self,
         contrast: str | None = None,
@@ -842,7 +840,6 @@ class DEResult:
         plt.show()
         return None
 
-    @_doc_params(common_plot_args=doc_common_plot_args)
     def plot_multicomparison_fc(
         self,
         *,
