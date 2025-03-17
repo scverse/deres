@@ -150,6 +150,7 @@ class DEResult:
     @_doc_params(common_plot_args=doc_common_plot_args)
     def plot_volcano(
         self,
+        contrast: str | None = None,
         *,
         pval_thresh: float = 0.05,
         log2fc_thresh: float = 0.75,
@@ -249,6 +250,11 @@ class DEResult:
         if colors is None:
             colors = ["gray", "#D62728", "#1F77B4"]
 
+        if self.contrasts is not None and contrast is None:
+            raise ValueError(
+                "If multiple contrasts are stored in the DEResults object, the volcano plot function requires you to specify a contrast"
+            )
+
         def _pval_reciprocal(lfc: float) -> float:
             """
             Function for relating -log10(pvalue) and logfoldchange in a reciprocal.
@@ -264,7 +270,6 @@ class DEResult:
                         return k
             return "other"
 
-        # TODO join the two mapping functions
         def _map_genes_categories(
             row: pd.Series,
             log2fc_col: str,
@@ -336,7 +341,7 @@ class DEResult:
                     return "not DE"
                 return "DE"
 
-        df = self._res.copy()
+        df = self.get_df(contrast)
 
         # clean and replace 0s as they would lead to -inf
         if df[[self.effect_size_col, self.p_col]].isnull().values.any():
@@ -739,6 +744,7 @@ class DEResult:
     @_doc_params(common_plot_args=doc_common_plot_args)
     def plot_fold_change(
         self,
+        contrast: str | None = None,
         *,
         var_names: Sequence[str] | None = None,
         n_top_vars: int = 15,
@@ -795,6 +801,11 @@ class DEResult:
         Preview:
             .. image:: /_static/docstring_previews/de_fold_change.png
         """
+        if self.contrasts is not None and contrast is None:
+            raise ValueError(
+                "If multiple contrasts are stored in the DEResults object, the volcano plot function requires you to specify a contrast"
+            )
+
         if var_names is None:
             var_names = (
                 self._res.sort_values(self.effect_size_col, ascending=False).head(n_top_vars)[self.var_col].tolist()
@@ -804,7 +815,7 @@ class DEResult:
             )
             assert len(var_names) == 2 * n_top_vars
 
-        df = self._res[self._res[self.var_col].isin(var_names)].copy()
+        df = self.get_df(contrast).loc[lambda x: x[self.var_col].isin(var_names)].copy()
         df.sort_values(self.effect_size_col, ascending=False, inplace=True)
 
         plt.figure(figsize=figsize)
