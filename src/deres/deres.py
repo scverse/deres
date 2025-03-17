@@ -54,7 +54,7 @@ class DEResult:
         contrast_col: str | None = None,
         var_col: str | None = None,
     ) -> None:
-        self.res = res
+        self._res = res
         self.layer = layer
         self.adata = adata
 
@@ -63,12 +63,12 @@ class DEResult:
         self.contrast_col = contrast_col
         self.var_col = var_col
 
-        for col in ["p_col", "effect_size_col", "contrast_col", "var_col"]:
-            if col not in self.res.columns:
+        for col in [self.p_col, self.effect_size_col, self.contrast_col, self.var_col]:
+            if col not in self._res.columns:
                 raise ValueError(f"Column {col} does not exist in the results data frame!")
 
-        for col in ["p_col", "effect_size_col"]:
-            if not np.issubdtype(self.res[col].dtype, np.number):
+        for col in [self.p_col, self.effect_size_col]:
+            if not np.issubdtype(self._res[col].dtype, np.number):  # type: ignore
                 raise ValueError(f"Column {col} must be numeric!")
 
     @property
@@ -77,7 +77,7 @@ class DEResult:
         if self.contrast_col is None:
             return None
         else:
-            return self.res[self.contrast_col].unique().tolist()
+            return self._res[self.contrast_col].unique().tolist()
 
     def p_adjust(self, method: Literal["fdr"] = "fdr", adj_col_name="adj_p_value") -> None:
         """Multiple testing correction for p-values
@@ -101,11 +101,22 @@ class DEResult:
                 "FDR correction requires statsmodels to be installed: run `!pip install statsmodels` and try again!"
             ) from None
 
-        self.res[adj_col_name] = statsmodels.stats.multitest.fdrcorrection(self.res[self.p_col])[1]
+        self._res[adj_col_name] = statsmodels.stats.multitest.fdrcorrection(self._res[self.p_col])[1]
         self.p_col = adj_col_name
 
+    def get_df(self, contrast: str | None = None) -> pd.DataFrame:
+        """
+        Get a copy of the results dataframe for a given contrast
+
+        If contrast is None, return the entire dataframe without filtering.
+        """
+        if contrast is None:
+            return self._res.copy()
+        else:
+            return self._res.loc[lambda x: x[self.contrast_col] == contrast].copy()
+
     @property
-    def data(self):
+    def expr_data(self):
         """Get the data matrix from anndata this object was initalized with (X or layer)."""
         if self.adata is None:
             return None
@@ -114,15 +125,27 @@ class DEResult:
         else:
             return self.adata.layers[self.layer]
 
-    def summary(self, cutoffs: Sequence[float] = (0.1, 0.05, 0.01, 0.001, 0.0001)) -> pd.DataFrame:
-        return pd.DataFrame(
-            {
-                "total": [np.sum(self.res[self.p_col] < c) for c in cutoffs],
-                "up": [np.sum((self.res[self.p_col] < c) & (self.res[self.effect_size_col] > 0)) for c in cutoffs],
-                "down": [np.sum((self.res[self.p_col] < c) & (self.res[self.effect_size_col] < 0)) for c in cutoffs],
-            },
-            index=[f"p < {c}" for c in cutoffs],
-        )
+    def summary(self, *, cutoffs: Sequence[float] = (0.1, 0.05, 0.01, 0.001, 0.0001)) -> pd.DataFrame:
+        """Obtain a summary data frame of differential expression results"""
+        dfs = []
+        for contr in [None] if self.contrasts is None else self.contrasts:
+            tmp_res = self.get_df(contr)
+            dfs.append(
+                pd.DataFrame(
+                    {
+                        "total": [np.sum(tmp_res[self.p_col] < c) for c in cutoffs],
+                        "up": [
+                            np.sum((tmp_res[self.p_col] < c) & (tmp_res[self.effect_size_col] > 0)) for c in cutoffs
+                        ],
+                        "down": [
+                            np.sum((tmp_res[self.p_col] < c) & (tmp_res[self.effect_size_col] < 0)) for c in cutoffs
+                        ],
+                        "contrast": contr,
+                    },
+                    index=[f"p < {c}" for c in cutoffs],
+                )
+            )
+        return pd.concat(dfs)
 
     @_doc_params(common_plot_args=doc_common_plot_args)
     def plot_volcano(
@@ -133,7 +156,6 @@ class DEResult:
         to_label: int | list[str] = 5,
         s_curve: bool | None = False,
         colors: list[str] | None = None,
-        varm_key: str | None = None,
         color_dict: dict[str, list[str]] | None = None,
         shape_dict: dict[str, list[str]] | None = None,
         size_col: str | None = None,
@@ -248,7 +270,7 @@ class DEResult:
             log2fc_col: str,
             nlog10_col: str,
             log2fc_thresh: float,
-            pval_thresh: float = None,
+            pval_thresh: float | None = None,
             s_curve: bool = False,
         ) -> str:
             """
@@ -280,12 +302,13 @@ class DEResult:
 
         def _map_genes_categories_highlight(
             row: pd.Series,
+            *,
             log2fc_col: str,
             nlog10_col: str,
             log2fc_thresh: float,
-            pval_thresh: float = None,
+            pval_thresh: float,
             s_curve: bool = False,
-            symbol_col: str = None,
+            symbol_col: str,
         ) -> str:
             """
             Map genes to categorize based on log2fc and pvalue.
@@ -313,7 +336,7 @@ class DEResult:
                     return "not DE"
                 return "DE"
 
-        df = self.res.copy()
+        df = self._res.copy()
 
         # clean and replace 0s as they would lead to -inf
         if df[[self.effect_size_col, self.p_col]].isnull().values.any():
@@ -528,9 +551,8 @@ class DEResult:
         groupby: str,
         pairedby: str,
         *,
-        var_names: Sequence[str] = None,
+        var_names: Sequence[str] | None = None,
         n_top_vars: int = 15,
-        layer: str = None,
         n_cols: int = 4,
         panel_size: tuple[int, int] = (5, 5),
         show_legend: bool = True,
@@ -617,17 +639,19 @@ class DEResult:
             raise ValueError("The number of groups in the group_by column must be exactly 2 to enable paired testing")
 
         if var_names is None:
-            var_names = self.res.head(n_top_vars)[self.var_col].tolist()
+            var_names = self._res.head(n_top_vars)[self.var_col].tolist()
 
         groupby_cols = [pairedby, groupby]
-        df = adata.obs.loc[:, groupby_cols].join(
-            pd.DataFrame(self.data[:, self.adata.var_names.isin(var_names)], index=adata.obs_names, columns=var_names)
+        df = self.adata.obs.loc[:, groupby_cols].join(
+            pd.DataFrame(
+                self.expr_data[:, self.adata.var_names.isin(var_names)], index=adata.obs_names, columns=var_names
+            )
         )
 
         # remove unpaired samples
         paired_samples = set(df[df[groupby] == groups[0]][pairedby]) & set(df[df[groupby] == groups[1]][pairedby])
         df = df[df[pairedby].isin(paired_samples)]
-        removed_samples = adata.obs[pairedby].nunique() - len(df[pairedby].unique())
+        removed_samples = self.adata.obs[pairedby].nunique() - len(df[pairedby].unique())
         if removed_samples > 0:
             logger.warning(f"{removed_samples} unpaired samples removed")
 
@@ -773,14 +797,14 @@ class DEResult:
         """
         if var_names is None:
             var_names = (
-                self.res.sort_values(self.effect_size_col, ascending=False).head(n_top_vars)[self.var_col].tolist()
+                self._res.sort_values(self.effect_size_col, ascending=False).head(n_top_vars)[self.var_col].tolist()
             )
             var_names += (
-                self.res.sort_values(self.effect_size_col, ascending=True).head(n_top_vars)[self.var_col].tolist()
+                self._res.sort_values(self.effect_size_col, ascending=True).head(n_top_vars)[self.var_col].tolist()
             )
             assert len(var_names) == 2 * n_top_vars
 
-        df = self.res[self.res[self.var_col].isin(var_names)].copy()
+        df = self._res[self._res[self.var_col].isin(var_names)].copy()
         df.sort_values(self.effect_size_col, ascending=False, inplace=True)
 
         plt.figure(figsize=figsize)
