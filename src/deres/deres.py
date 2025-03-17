@@ -4,7 +4,6 @@ from itertools import zip_longest
 from typing import Literal
 
 import adjustText
-import anndata as ad
 import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,10 +14,35 @@ from lamin_utils import logger
 from matplotlib.pyplot import Figure
 from matplotlib.ticker import MaxNLocator
 from pertpy._doc import _doc_params, doc_common_plot_args
-from pertpy.tools import PseudobulkSpace
 
 
 class DEResult:
+    """
+    Container to hold a differential expression result and associated metadata.
+
+    Parameters
+    ----------
+    res
+        The data frame with the statistical result. Typically contains a column with p-values
+        and a column with some sort of effect size (e.g. fold change). The data frame may contain any additional
+        columns
+    adata
+        associated AnnData object that holds expression values that were used to obtain the statistical results.
+        This is optional, and only required for some plot types.
+    layer
+        layer of AnnData to use (if any). If `None`, use `X`
+    p_col
+        Column in `res` containing the p-value
+    effect_size_col
+        Column in `res` containing the effect size (e.g. log fold change)
+    contrast_col
+        Column in `res` containing the contrast name. Only applicable if results
+        from multiple comparisons are stored in the data frame. If it contains only the results
+        from a single comparison, just leave this as `None`.
+    var_col
+        Column in `res` containing the variable name (e.g. gene symbol). If `None`, use the index.
+    """
+
     def __init__(
         self,
         res: pd.DataFrame,
@@ -27,43 +51,49 @@ class DEResult:
         layer: str | None = None,
         p_col: str = "p_value",
         effect_size_col: str = "log_fc",
+        contrast_col: str | None = None,
         var_col: str | None = None,
     ) -> None:
-        """
-        Container to hold a differential expression result and associated metadata.
-
-        Parameters
-        ----------
-        res
-            The data frame with the statistical result. Typically contains a column with p-values
-            and a column with some sort of effect size (e.g. fold change). The data frame may contain any additional
-            columns
-        adata
-            associated AnnData object that holds expression values that were used to obtain the statistical results.
-            This is optional, and only required for some plot types.
-        layer
-            layer of AnnData to use (if any). If `None`, use `X`
-        p_col
-            Column in `res` containing the p-value
-        effect_size_col
-            Column in `res` containing the effect size (e.g. log fold change)
-        var_col
-            Column in `res` containing the variable name (e.g. gene symbol). If `None`, use the index.
-
-        """
         self.res = res
         self.p_col = p_col
         self.layer = layer
         self.adata = adata
         self.effect_size_col = effect_size_col
+        self.contrast_col = contrast_col
         self.var_col = var_col
 
-    def p_adjust(method: Literal["fdr"] = "fdr") -> None:
+    @property
+    def contrasts(self) -> list | None:
+        """Get a list of all contrast available in the results df"""
+        if self.contrast_col is None:
+            return None
+        else:
+            return self.res[self.contrast_col].unique().tolist()
+
+    def p_adjust(self, method: Literal["fdr"] = "fdr", adj_col_name="adj_p_value") -> None:
         """Multiple testing correction for p-values
 
-        Adds a new column and updates th pointer `p_col`.
+        Adds a new column to the results dataframe and updates the pointer `p_col`.
+
+        Parameters
+        ----------
+        method
+            method to use for multiple testing correction. Currently only fdr is implemented.
+        adj_col_name
+            Col name used for the adjusted p values.
         """
-        raise NotImplementedError
+        if method != "fdr":
+            raise ValueError("Currently only FDR is implemented")
+
+        try:
+            import statsmodels.stats.multitest
+        except ImportError:
+            raise ImportError(
+                "FDR correction requires statsmodels to be installed: run `!pip install statsmodels` and try again!"
+            ) from none
+
+        self.res[adj_col_name] = statsmodels.stats.multitest.fdrcorrection(self.res[self.p_col])
+        self.p_col = adj_col_name
 
     @property
     def data(self):
@@ -88,7 +118,6 @@ class DEResult:
     @_doc_params(common_plot_args=doc_common_plot_args)
     def plot_volcano(
         self,
-        data: pd.DataFrame | ad.AnnData,
         *,
         pval_thresh: float = 0.05,
         log2fc_thresh: float = 0.75,
@@ -115,8 +144,6 @@ class DEResult:
 
         Parameters
         ----------
-        data
-            DataFrame or AnnData to plot.
         pval_thresh
             Threshold p value for significance, by default 0.05
         log2fc_thresh
@@ -277,31 +304,25 @@ class DEResult:
                     return "not DE"
                 return "DE"
 
-        if isinstance(data, ad.AnnData):
-            if varm_key is None:
-                raise ValueError("Please pass a .varm key to use for plotting")
-
-            raise NotImplementedError("Anndata not implemented yet")  # TODO: Implement this
-            df = data.varm[varm_key].copy()
-
-        df = data.copy(deep=True)
+        df = self.res.copy()
 
         # clean and replace 0s as they would lead to -inf
-        if df[[log2fc_col, pvalue_col]].isnull().values.any():
+        if df[[self.effect_size_col, self.p_col]].isnull().values.any():
             print("NaNs encountered, dropping rows with NaNs")
-            df = df.dropna(subset=[log2fc_col, pvalue_col])
+            df = df.dropna(subset=[self.effect_size_col, self.p_col])
 
-        if df[pvalue_col].min() == 0:
+        if df[self.p_col].min() == 0:
+            # TODO use np.nextafter https://stackoverflow.com/questions/38477908/smallest-positive-float64-number
             print("0s encountered for p value, replacing with 1e-323")
-            df.loc[df[pvalue_col] == 0, pvalue_col] = 1e-323
+            df.loc[df[self.p_col] == 0, self.p_col] = 1e-323
 
         # convert p value threshold to nlog10
         pval_thresh = -np.log10(pval_thresh)
         # make nlog10 column
-        df["nlog10"] = -np.log10(df[pvalue_col])
+        df["nlog10"] = -np.log10(df[self.p_col])
         y_max = df["nlog10"].max() + 1
         # make a column to pick top genes
-        df["top_genes"] = df["nlog10"] * df[log2fc_col]
+        df["top_genes"] = df["nlog10"] * df[self.effect_size_col]
 
         # Label everything with assigned color / shape
         if shape_dict or color_dict:
@@ -310,7 +331,7 @@ class DEResult:
                 combined_labels.extend([item for sublist in shape_dict.values() for item in sublist])
             if isinstance(color_dict, dict):
                 combined_labels.extend([item for sublist in color_dict.values() for item in sublist])
-            label_df = df[df[symbol_col].isin(combined_labels)]
+            label_df = df[df[self.var_col].isin(combined_labels)]
 
         # Label top n_gens
         elif isinstance(to_label, int):
@@ -323,7 +344,7 @@ class DEResult:
 
         # assume that a list of genes was passed to label
         else:
-            label_df = df[df[symbol_col].isin(to_label)]
+            label_df = df[df[self.var_col].isin(to_label)]
 
         # By default mode colors by up/down if no dict is passed
 
@@ -331,7 +352,7 @@ class DEResult:
             df["color"] = df.apply(
                 lambda row: _map_genes_categories(
                     row,
-                    log2fc_col=log2fc_col,
+                    log2fc_col=self.effect_size_col,
                     nlog10_col="nlog10",
                     log2fc_thresh=log2fc_thresh,
                     pval_thresh=pval_thresh,
@@ -347,11 +368,11 @@ class DEResult:
             df["color"] = df.apply(
                 lambda row: _map_genes_categories_highlight(
                     row,
-                    log2fc_col=log2fc_col,
+                    log2fc_col=self.effect_size_col,
                     nlog10_col="nlog10",
                     log2fc_thresh=log2fc_thresh,
                     pval_thresh=pval_thresh,
-                    symbol_col=symbol_col,
+                    symbol_col=self.var_col,
                     s_curve=s_curve,
                 ),
                 axis=1,
@@ -379,7 +400,7 @@ class DEResult:
         # coloring if dictionary passed, subtle background + highlight
         # map shapes if dictionary exists
         if shape_dict is not None:
-            df["shape"] = df[symbol_col].map(_map_shape)
+            df["shape"] = df[self.var_col].map(_map_shape)
             user_added_cats = [x for x in df["shape"].unique() if x != "other"]
             shape_order = ["other"] + user_added_cats
             if shapes is None:
@@ -395,15 +416,15 @@ class DEResult:
         # We want plot highlighted genes on top + at bigger size, split dataframe
         df_highlight = None
         if shape_dict or color_dict:
-            label_genes = label_df[symbol_col].unique()
-            df_highlight = df[df[symbol_col].isin(label_genes)]
-            df = df[~df[symbol_col].isin(label_genes)]
+            label_genes = label_df[self.var_col].unique()
+            df_highlight = df[df[self.var_col].isin(label_genes)]
+            df = df[~df[self.var_col].isin(label_genes)]
 
         plt.figure(figsize=figsize)
         # Plot non-highlighted genes
         ax = sns.scatterplot(
             data=df,
-            x=log2fc_col,
+            x=self.effect_size_col,
             y="nlog10",
             hue="color",
             hue_order=hues,
@@ -419,7 +440,7 @@ class DEResult:
         if df_highlight is not None:
             ax = sns.scatterplot(
                 data=df_highlight,
-                x=log2fc_col,
+                x=self.effect_size_col,
                 y="nlog10",
                 hue="color",
                 hue_order=hues,
@@ -453,9 +474,9 @@ class DEResult:
         texts = []
         for i in range(len(label_df)):
             txt = plt.text(
-                x=label_df.iloc[i][log2fc_col],
+                x=label_df.iloc[i][self.effect_size_col],
                 y=label_df.iloc[i].nlog10,
-                s=label_df.iloc[i][symbol_col],
+                s=label_df.iloc[i][self.var_col],
                 fontsize=fontsize,
             )
 
@@ -478,9 +499,9 @@ class DEResult:
 
         # Set default axis titles
         if x_label is None:
-            x_label = log2fc_col
+            x_label = self.effect_size_col
         if y_label is None:
-            y_label = f"-$log_{{10}}$ {pvalue_col}"
+            y_label = f"-$log_{{10}}$ {self.p_col}"
 
         plt.xlabel(x_label, size=15)
         plt.ylabel(y_label, size=15)
@@ -495,16 +516,12 @@ class DEResult:
     @_doc_params(common_plot_args=doc_common_plot_args)
     def plot_paired(
         self,
-        adata: ad.AnnData,
-        results_df: pd.DataFrame,
         groupby: str,
         pairedby: str,
         *,
         var_names: Sequence[str] = None,
         n_top_vars: int = 15,
         layer: str = None,
-        pvalue_col: str = "adj_p_value",
-        symbol_col: str = "variable",
         n_cols: int = 4,
         panel_size: tuple[int, int] = (5, 5),
         show_legend: bool = True,
@@ -519,85 +536,84 @@ class DEResult:
 
         Visualizes a panel of paired scatterplots per variable.
 
-        Args:
-            adata: AnnData object, can be pseudobulked.
-            results_df: DataFrame with results from a differential expression test.
-            groupby: .obs column containing the grouping. Must contain exactly two different values.
-            pairedby: .obs column containing the pairing (e.g. "patient_id"). If None, an independent t-test is performed.
-            var_names: Variables to plot.
-            n_top_vars: Number of top variables to plot.
-            layer: Layer to use for plotting.
-            pvalue_col: Column name of the p values.
-            symbol_col: Column name of gene IDs.
-            n_cols: Number of columns in the plot.
-            panel_size: Size of each panel.
-            show_legend: Whether to show the legend.
-            size: Size of the points.
-            y_label: Label for the y-axis.
-            pvalue_template: Template for the p-value string displayed in the title of each panel.
-            boxplot_properties: Additional properties for the boxplot, passed to seaborn.boxplot.
-            palette: Color palette for the line- and stripplot.
-            {common_plot_args}
+        Parameters
+        ----------
+        groupby
+            .obs column containing the grouping. Must contain exactly two different values.
+        pairedby
+            .obs column containing the pairing (e.g. "patient_id"). If None, an independent t-test is performed.
+        var_names
+            Variables to plot.
+        n_top_vars
+            Number of top variables to plot. Default: 15.
+        layer
+            Layer to use for plotting.
+        n_cols
+            Number of columns in the plot. Default: 4.
+        panel_size
+            Size of each panel. Default: (5, 5).
+        show_legend
+            Whether to show the legend. Default: True.
+        size
+            Size of the points. Default: 10.
+        y_label
+            Label for the y-axis. Default: "expression".
+        pvalue_template
+            Template for the p-value string displayed in the title of each panel.
+        boxplot_properties
+            Additional properties for the boxplot, passed to seaborn.boxplot.
+        palette
+            Color palette for the line- and stripplot.
+        return_fig
+            If True, return the figure. Default: False.
 
         Returns
         -------
+        Figure or None
             If `return_fig` is `True`, returns the figure, otherwise `None`.
 
         Examples
         --------
-            >>> # Example with EdgeR
-            >>> import pertpy as pt
-            >>> adata = pt.dt.zhang_2021()
-            >>> adata.layers["counts"] = adata.X.copy()
-            >>> ps = pt.tl.PseudobulkSpace()
-            >>> pdata = ps.compute(
-            ...     adata,
-            ...     target_col="Patient",
-            ...     groups_col="Cluster",
-            ...     layer_key="counts",
-            ...     mode="sum",
-            ...     min_cells=10,
-            ...     min_counts=1000,
-            ... )
-            >>> edgr = pt.tl.EdgeR(pdata, design="~Efficacy+Treatment")
-            >>> edgr.fit()
-            >>> res_df = edgr.test_contrasts(
-            ...     edgr.contrast(column="Treatment", baseline="Chemo", group_to_compare="Anti-PD-L1+Chemo")
-            ... )
-            >>> edgr.plot_paired(pdata, results_df=res_df, n_top_vars=8, groupby="Treatment", pairedby="Efficacy")
+        >>> # Example with EdgeR
+        >>> import pertpy as pt
+        >>> adata = pt.dt.zhang_2021()
+        >>> adata.layers["counts"] = adata.X.copy()
+        >>> ps = pt.tl.PseudobulkSpace()
+        >>> pdata = ps.compute(
+        ...     adata,
+        ...     target_col="Patient",
+        ...     groups_col="Cluster",
+        ...     layer_key="counts",
+        ...     mode="sum",
+        ...     min_cells=10,
+        ...     min_counts=1000,
+        ... )
+        >>> edgr = pt.tl.EdgeR(pdata, design="~Efficacy+Treatment")
+        >>> edgr.fit()
+        >>> res_df = edgr.test_contrasts(
+        ...     edgr.contrast(column="Treatment", baseline="Chemo", group_to_compare="Anti-PD-L1+Chemo")
+        ... )
+        >>> edgr.plot_paired(pdata, results_df=res_df, n_top_vars=8, groupby="Treatment", pairedby="Efficacy")
 
         Preview:
             .. image:: /_static/docstring_previews/de_paired_expression.png
         """
         if boxplot_properties is None:
             boxplot_properties = {}
-        groups = adata.obs[groupby].unique()
+        if self.adata is None:
+            raise ValueError("plot_paired requires that DEResult has been initalized with an AnnData object")
+
+        groups = self.adata.obs[groupby].unique()
         if len(groups) != 2:
             raise ValueError("The number of groups in the group_by column must be exactly 2 to enable paired testing")
 
         if var_names is None:
-            var_names = results_df.head(n_top_vars)[symbol_col].tolist()
-
-        adata = adata[:, var_names]
-
-        if any(adata.obs[[groupby, pairedby]].value_counts() > 1):
-            logger.info("Performing pseudobulk for paired samples")
-            ps = PseudobulkSpace()
-            adata = ps.compute(
-                adata, target_col=groupby, groups_col=pairedby, layer_key=layer, mode="sum", min_cells=1, min_counts=1
-            )
-
-        if layer is not None:
-            X = adata.layers[layer]
-        else:
-            X = adata.X
-        try:
-            X = X.toarray()
-        except AttributeError:
-            pass
+            var_names = self.res.head(n_top_vars)[self.var_col].tolist()
 
         groupby_cols = [pairedby, groupby]
-        df = adata.obs.loc[:, groupby_cols].join(pd.DataFrame(X, index=adata.obs_names, columns=var_names))
+        df = adata.obs.loc[:, groupby_cols].join(
+            pd.DataFrame(self.data[:, self.adata.var_names.isin(var_names)], index=adata.obs_names, columns=var_names)
+        )
 
         # remove unpaired samples
         paired_samples = set(df[df[groupby] == groups[0]][pairedby]) & set(df[df[groupby] == groups[1]][pairedby])
@@ -606,7 +622,7 @@ class DEResult:
         if removed_samples > 0:
             logger.warning(f"{removed_samples} unpaired samples removed")
 
-        pvalues = results_df.set_index(symbol_col).loc[var_names, pvalue_col].values
+        pvalues = results_df.set_index(symbol_col).loc[var_names, self.p_col].values
         df.reset_index(drop=False, inplace=True)
 
         # transform data for seaborn
@@ -690,72 +706,78 @@ class DEResult:
     @_doc_params(common_plot_args=doc_common_plot_args)
     def plot_fold_change(
         self,
-        results_df: pd.DataFrame,
         *,
-        var_names: Sequence[str] = None,
+        var_names: Sequence[str] | None = None,
         n_top_vars: int = 15,
-        log2fc_col: str = "log_fc",
-        symbol_col: str = "variable",
         y_label: str = "Log2 fold change",
         figsize: tuple[int, int] = (10, 5),
         return_fig: bool = False,
         **barplot_kwargs,
     ) -> Figure | None:
-        """Plot a metric from the results as a bar chart, optionally with additional information about paired samples in a scatter plot.
+        """Plot a metric from the results as a bar chart.
 
-        Args:
-            results_df: DataFrame with results from DE analysis.
-            var_names: Variables to plot. If None, the top n_top_vars variables based on the log2 fold change are plotted.
-            n_top_vars: Number of top variables to plot. The top and bottom n_top_vars variables are plotted, respectively.
-            log2fc_col: Column name of log2 Fold-Change values.
-            symbol_col: Column name of gene IDs.
-            y_label: Label for the y-axis.
-            figsize: Size of the figure.
-            {common_plot_args}
-            **barplot_kwargs: Additional arguments for seaborn.barplot.
+        Parameters
+        ----------
+        var_names
+            Variables to plot. If None, the top n_top_vars variables based on the log2 fold change are plotted.
+        n_top_vars
+            Number of top variables to plot. The top and bottom n_top_vars variables are plotted, respectively.
+        y_label
+            Label for the y-axis.
+        figsize
+            Size of the figure.
+        return_fig
+            If True, return the figure. Default: False.
+        **barplot_kwargs
+            Additional arguments for seaborn.barplot.
 
         Returns
         -------
+        Figure or None
             If `return_fig` is `True`, returns the figure, otherwise `None`.
 
         Examples
         --------
-            >>> # Example with EdgeR
-            >>> import pertpy as pt
-            >>> adata = pt.dt.zhang_2021()
-            >>> adata.layers["counts"] = adata.X.copy()
-            >>> ps = pt.tl.PseudobulkSpace()
-            >>> pdata = ps.compute(
-            ...     adata,
-            ...     target_col="Patient",
-            ...     groups_col="Cluster",
-            ...     layer_key="counts",
-            ...     mode="sum",
-            ...     min_cells=10,
-            ...     min_counts=1000,
-            ... )
-            >>> edgr = pt.tl.EdgeR(pdata, design="~Efficacy+Treatment")
-            >>> edgr.fit()
-            >>> res_df = edgr.test_contrasts(
-            ...     edgr.contrast(column="Treatment", baseline="Chemo", group_to_compare="Anti-PD-L1+Chemo")
-            ... )
-            >>> edgr.plot_fold_change(res_df)
+        >>> # Example with EdgeR
+        >>> import pertpy as pt
+        >>> adata = pt.dt.zhang_2021()
+        >>> adata.layers["counts"] = adata.X.copy()
+        >>> ps = pt.tl.PseudobulkSpace()
+        >>> pdata = ps.compute(
+        ...     adata,
+        ...     target_col="Patient",
+        ...     groups_col="Cluster",
+        ...     layer_key="counts",
+        ...     mode="sum",
+        ...     min_cells=10,
+        ...     min_counts=1000,
+        ... )
+        >>> edgr = pt.tl.EdgeR(pdata, design="~Efficacy+Treatment")
+        >>> edgr.fit()
+        >>> res_df = edgr.test_contrasts(
+        ...     edgr.contrast(column="Treatment", baseline="Chemo", group_to_compare="Anti-PD-L1+Chemo")
+        ... )
+        >>> edgr.plot_fold_change(res_df)
 
         Preview:
             .. image:: /_static/docstring_previews/de_fold_change.png
         """
         if var_names is None:
-            var_names = results_df.sort_values(log2fc_col, ascending=False).head(n_top_vars)[symbol_col].tolist()
-            var_names += results_df.sort_values(log2fc_col, ascending=True).head(n_top_vars)[symbol_col].tolist()
+            var_names = (
+                self.res.sort_values(self.effect_size_col, ascending=False).head(n_top_vars)[self.var_col].tolist()
+            )
+            var_names += (
+                self.res.sort_values(self.effect_size_col, ascending=True).head(n_top_vars)[self.var_col].tolist()
+            )
             assert len(var_names) == 2 * n_top_vars
 
-        df = results_df[results_df[symbol_col].isin(var_names)]
-        df.sort_values(log2fc_col, ascending=False, inplace=True)
+        df = self.res[self.res[self.var_col].isin(var_names)].copy()
+        df.sort_values(self.effect_size_col, ascending=False, inplace=True)
 
         plt.figure(figsize=figsize)
         sns.barplot(
-            x=symbol_col,
-            y=log2fc_col,
+            x=self.var_col,
+            y=self.effect_size_col,
             data=df,
             palette="RdBu",
             legend=False,
@@ -773,13 +795,9 @@ class DEResult:
     @_doc_params(common_plot_args=doc_common_plot_args)
     def plot_multicomparison_fc(
         self,
-        results_df: pd.DataFrame,
         *,
         n_top_vars=15,
         contrast_col: str = "contrast",
-        log2fc_col: str = "log_fc",
-        pvalue_col: str = "adj_p_value",
-        symbol_col: str = "variable",
         marker_size: int = 100,
         figsize: tuple[int, int] = (10, 2),
         x_label: str = "Contrast",
@@ -794,7 +812,7 @@ class DEResult:
             n_top_vars: Number of top variables to plot per group.
             contrast_col: Column in results_df containing information about the contrast.
             log2fc_col: Column in results_df containing the log2 fold change.
-            pvalue_col: Column in results_df containing the p-value. Can be used to switch between adjusted and unadjusted p-values.
+            self.p_col: Column in results_df containing the p-value. Can be used to switch between adjusted and unadjusted p-values.
             symbol_col: Column in results_df containing the gene symbol.
             marker_size: Size of the biggest marker for significant variables.
             figsize: Size of the figure.
@@ -844,7 +862,7 @@ class DEResult:
             else:
                 return "n.s."
 
-        results_df["significance"] = results_df[pvalue_col].apply(_get_significance)
+        results_df["significance"] = results_df[self.p_col].apply(_get_significance)
 
         var_names = []
         for group in groups:
