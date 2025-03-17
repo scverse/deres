@@ -1,8 +1,8 @@
 # API
 
 ```{eval-rst}
-.. module:: formulaic_contrasts
-.. currentmodule:: formulaic_contrasts
+.. module:: deres
+.. currentmodule:: deres
 
 .. autosummary::
     :toctree: generated

@@ -234,8 +234,6 @@ class DEResult:
         ... )
         >>> edgr.plot_volcano(res_df, log2fc_thresh=0)
 
-        Preview:
-            .. image:: /_static/docstring_previews/de_volcano.png
         """
         if colors is None:
             colors = ["gray", "#D62728", "#1F77B4"]
@@ -627,8 +625,6 @@ class DEResult:
         ... )
         >>> edgr.plot_paired(pdata, results_df=res_df, n_top_vars=8, groupby="Treatment", pairedby="Efficacy")
 
-        Preview:
-            .. image:: /_static/docstring_previews/de_paired_expression.png
         """
         if self.contrasts is not None and contrast is None:
             raise ValueError(
@@ -802,8 +798,6 @@ class DEResult:
         ... )
         >>> edgr.plot_fold_change(res_df)
 
-        Preview:
-            .. image:: /_static/docstring_previews/de_fold_change.png
         """
         if self.contrasts is not None and contrast is None:
             raise ValueError(
@@ -894,8 +888,6 @@ class DEResult:
         >>> res_df = edgr.compare_groups(pdata, column="Efficacy", baseline="SD", groups_to_compare=["PR", "PD"])
         >>> edgr.plot_multicomparison_fc(res_df)
 
-        Preview:
-            .. image:: /_static/docstring_previews/de_multicomparison_fc.png
         """
         if self.contrasts is None:
             raise ValueError("The multicomparison plot requires the contrasts column to be set.")
