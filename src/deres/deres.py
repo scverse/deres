@@ -115,16 +115,6 @@ class DEResult:
         else:
             return self._res.loc[lambda x: x[self.contrast_col] == contrast].copy()
 
-    @property
-    def expr_data(self):
-        """Get the data matrix from anndata this object was initalized with (X or layer)."""
-        if self.adata is None:
-            return None
-        if self.layer is None:
-            return self.adata.X
-        else:
-            return self.adata.layers[self.layer]
-
     def summary(self, *, cutoffs: Sequence[float] = (0.1, 0.05, 0.01, 0.001, 0.0001)) -> pd.DataFrame:
         """Obtain a summary data frame of differential expression results"""
         dfs = []
@@ -555,7 +545,9 @@ class DEResult:
         self,
         groupby: str,
         pairedby: str,
+        contrast: str | None = None,
         *,
+        groups: Sequence[str] | None = None,
         var_names: Sequence[str] | None = None,
         n_top_vars: int = 15,
         n_cols: int = 4,
@@ -578,6 +570,11 @@ class DEResult:
             .obs column containing the grouping. Must contain exactly two different values.
         pairedby
             .obs column containing the pairing (e.g. "patient_id"). If None, an independent t-test is performed.
+        contrast
+            If multiple contrasts are stored in the results data frame, you need to specify one contrast here.
+        groups
+            If the AnnData object contains more than two unique values in `pairedby`, you need
+            to specify the two categories you'd like to show in the plot.
         var_names
             Variables to plot.
         n_top_vars
@@ -634,33 +631,42 @@ class DEResult:
         Preview:
             .. image:: /_static/docstring_previews/de_paired_expression.png
         """
-        if boxplot_properties is None:
-            boxplot_properties = {}
+        if self.contrasts is not None and contrast is None:
+            raise ValueError(
+                "If multiple contrasts are stored in the DEResults object, the volcano plot function requires you to specify a contrast"
+            )
         if self.adata is None:
             raise ValueError("plot_paired requires that DEResult has been initalized with an AnnData object")
-
-        groups = self.adata.obs[groupby].unique()
+        if groups is not None:
+            tmp_adata = self.adata[self.adata.obs[groupby].isin(groups), :].copy()
+            tmp_adata.obs[groupby] = tmp_adata.obs[groupby].cat.remove_unused_categories()
+        else:
+            tmp_adata = self.adata
+            groups = tmp_adata.obs[groupby].unique()
         if len(groups) != 2:
             raise ValueError("The number of groups in the group_by column must be exactly 2 to enable paired testing")
+        results_df = self.get_df(contrast)
+
+        print(tmp_adata.obs[groupby].cat.categories)
+
+        if boxplot_properties is None:
+            boxplot_properties = {}
 
         if var_names is None:
-            var_names = self._res.head(n_top_vars)[self.var_col].tolist()
+            var_names = self.get_df(contrast).head(n_top_vars)[self.var_col].tolist()
+        tmp_adata = tmp_adata[:, var_names]
 
         groupby_cols = [pairedby, groupby]
-        df = self.adata.obs.loc[:, groupby_cols].join(
-            pd.DataFrame(
-                self.expr_data[:, self.adata.var_names.isin(var_names)], index=adata.obs_names, columns=var_names
-            )
-        )
+        df = tmp_adata.obs.loc[:, groupby_cols].join(tmp_adata.to_df(self.layer))
 
         # remove unpaired samples
         paired_samples = set(df[df[groupby] == groups[0]][pairedby]) & set(df[df[groupby] == groups[1]][pairedby])
         df = df[df[pairedby].isin(paired_samples)]
-        removed_samples = self.adata.obs[pairedby].nunique() - len(df[pairedby].unique())
+        removed_samples = tmp_adata.obs[pairedby].nunique() - len(df[pairedby].unique())
         if removed_samples > 0:
             logger.warning(f"{removed_samples} unpaired samples removed")
 
-        pvalues = results_df.set_index(symbol_col).loc[var_names, self.p_col].values
+        pvalues = results_df.set_index(self.var_col).loc[var_names, self.p_col].values
         df.reset_index(drop=False, inplace=True)
 
         # transform data for seaborn
@@ -732,7 +738,7 @@ class DEResult:
         if show_legend is True:
             axes[n_panels - 1].legend().set_visible(True)
             axes[n_panels - 1].legend(
-                bbox_to_anchor=(0.5, -0.1), loc="upper center", ncol=adata.obs[pairedby].nunique()
+                bbox_to_anchor=(0.5, -0.1), loc="upper center", ncol=tmp_adata.obs[pairedby].nunique()
             )
 
         plt.tight_layout()
