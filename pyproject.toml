@@ -24,7 +24,6 @@ classifiers = [
 ]
 dependencies = [
   "anndata",
-  "formulaic>=1.1.1",
   "pandas>=2.2.3",
 ]
 optional-dependencies.dev = [
@@ -33,11 +32,14 @@ optional-dependencies.dev = [
 ]
 optional-dependencies.doc = [
   "docutils>=0.8,!=0.18.*,!=0.19.*",
+  "formulaic>=1.1.1",
   "ipykernel",
   "ipython",
   "myst-nb>=1.1",
+  "nbconvert",
   "pandas",
   "pertpy",
+  "pydeseq2",
   "scanpy",
   # Until pybtex >0.23.0 releases: https://bitbucket.org/pybtex-devs/pybtex/issues/169/
   "setuptools",
