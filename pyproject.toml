@@ -1,10 +1,9 @@
 [build-system]
 build-backend = "hatchling.build"
-requires = [ "hatchling" ]
+requires = [ "hatch-vcs", "hatchling" ]
 
 [project]
 name = "deres"
-version = "0.0.1"
 description = "Container and visualization functions for differential expression (and similar) result tables."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -22,6 +21,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
 ]
+dynamic = [ "version" ]
 dependencies = [
   "anndata",
   "pandas>=2.2.3",
@@ -73,6 +73,9 @@ features = [ "doc" ]
 scripts.build = "sphinx-build -M html docs docs/_build {args}"
 scripts.open = "python -m webbrowser -t docs/_build/html/index.html"
 scripts.clean = "git clean -fdX -- {args:docs}"
+
+[tool.hatch.version]
+source = "vcs"
 
 [tool.hatch.envs.hatch-test]
 features = [ "test" ]
