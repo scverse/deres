@@ -699,7 +699,6 @@ wheels = [
 
 [[package]]
 name = "deres"
-version = "0.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "anndata" },
@@ -2823,7 +2822,7 @@ wheels = [
 
 [[package]]
 name = "pertpy"
-version = "0.9.4"
+version = "0.10.1"
 source = { directory = "../pertpy" }
 dependencies = [
     { name = "adjusttext" },
@@ -2838,8 +2837,8 @@ dependencies = [
     { name = "requests" },
     { name = "rich" },
     { name = "scanpy", extra = ["leiden"] },
+    { name = "scikit-learn" },
     { name = "scikit-misc" },
-    { name = "scipy" },
     { name = "scvi-tools" },
     { name = "sparsecca" },
 ]
@@ -2849,13 +2848,12 @@ requires-dist = [
     { name = "adjusttext" },
     { name = "arviz", marker = "extra == 'coda'" },
     { name = "blitzgsea" },
-    { name = "cellxgene-lamin", marker = "extra == 'validator'" },
     { name = "coverage", marker = "extra == 'test'" },
     { name = "decoupler" },
     { name = "docutils", marker = "extra == 'doc'", specifier = ">=0.8,!=0.18.*,!=0.19.*" },
     { name = "ete3", marker = "extra == 'coda'" },
-    { name = "findrefs", marker = "extra == 'validator'" },
     { name = "formulaic", marker = "extra == 'de'" },
+    { name = "formulaic-contrasts", marker = "extra == 'de'", specifier = ">=0.2.0" },
     { name = "furo", marker = "extra == 'doc'" },
     { name = "ipykernel", marker = "extra == 'doc'" },
     { name = "ipython", marker = "extra == 'doc'" },
@@ -2870,16 +2868,15 @@ requires-dist = [
     { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "pubchempy" },
     { name = "pyarrow" },
-    { name = "pydeseq2", marker = "extra == 'de'" },
-    { name = "pyenchant", marker = "extra == 'doc'" },
+    { name = "pydeseq2", marker = "extra == 'de'", specifier = ">=0.5.0rc1" },
     { name = "pygments", marker = "extra == 'doc'" },
     { name = "pyqt5", marker = "extra == 'coda'" },
     { name = "pytest", marker = "extra == 'test'" },
     { name = "requests" },
     { name = "rich" },
     { name = "scanpy", extras = ["leiden"] },
+    { name = "scikit-learn", specifier = ">=1.4" },
     { name = "scikit-misc" },
-    { name = "scipy" },
     { name = "scvi-tools" },
     { name = "sparsecca" },
     { name = "sphinx", marker = "extra == 'doc'", specifier = ">=4" },
@@ -2893,7 +2890,6 @@ requires-dist = [
     { name = "sphinxcontrib-bibtex", marker = "extra == 'doc'", specifier = ">=1.0.0" },
     { name = "sphinxext-opengraph", marker = "extra == 'doc'" },
     { name = "toytree", marker = "extra == 'coda'" },
-    { name = "wetlab", marker = "extra == 'validator'" },
 ]
 
 [[package]]

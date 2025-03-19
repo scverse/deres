@@ -906,13 +906,12 @@ class DEResult:
         results_df["abs_log_fc"] = results_df[self.effect_size_col].abs()
         results_df["significance"] = results_df[self.p_col].apply(_get_significance)
 
-        var_names = []
-        for contr in self.contrasts:
-            var_names.extend(
-                results_df[results_df[self.contrast_col] == contr]
-                .sort_values("abs_log_fc", ascending=False)
-                .head(n_top_vars)[self.var_col]
-            )
+        var_names = (
+            results_df.groupby(self.contrast_col)
+            .apply(lambda x: x.head(n_top_vars))
+            .sort_values(self.p_col)
+            .drop_duplicates(self.var_col, keep="first")[self.var_col]
+        )
 
         results_df = results_df[results_df[self.var_col].isin(var_names)]
         df = results_df.pivot(index=self.contrast_col, columns=self.var_col, values=self.effect_size_col)[var_names]
