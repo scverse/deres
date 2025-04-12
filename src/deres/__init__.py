@@ -1,7 +1,5 @@
 from importlib.metadata import version
 
-from . import pl, pp, tl
-
-__all__ = ["pl", "pp", "tl"]
+from .deres import DEResult
 
 __version__ = version("deres")
