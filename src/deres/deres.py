@@ -2,7 +2,7 @@ import logging
 import math
 from collections.abc import Sequence
 from itertools import zip_longest
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import adjustText
 import matplotlib.patheffects as PathEffects
@@ -10,9 +10,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from anndata import AnnData
 from matplotlib.pyplot import Figure
 from matplotlib.ticker import MaxNLocator
+
+if TYPE_CHECKING:
+    from anndata import AnnData
 
 logger = logging.getLogger("deres")
 
@@ -47,7 +49,7 @@ class DEResult:
     def __init__(
         self,
         res: pd.DataFrame,
-        adata: AnnData | None = None,
+        adata: "AnnData | None" = None,
         *,
         layer: str | None = None,
         p_col: str = "p_value",
