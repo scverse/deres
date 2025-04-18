@@ -7,12 +7,8 @@ name = "deres"
 description = "Container and visualization functions for differential expression (and similar) result tables."
 readme = "README.md"
 license = { file = "LICENSE" }
-maintainers = [
-  { name = "Gregor Sturm", email = "gregor.sturm@scverse.org" },
-]
-authors = [
-  { name = "Gregor Sturm" },
-]
+maintainers = [ { name = "Gregor Sturm", email = "gregor.sturm@scverse.org" } ]
+authors = [ { name = "Gregor Sturm" } ]
 requires-python = ">=3.10"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
@@ -23,15 +19,13 @@ classifiers = [
 ]
 dynamic = [ "version" ]
 dependencies = [
-  "adjustTest", 
+  "adjusttext",
   "matplotlib",
   "pandas>=2.2.3",
+  "seaborn",
   "statsmodels>=0.14.4",
 ]
-optional-dependencies.dev = [
-  "pre-commit",
-  "twine>=4.0.2",
-]
+optional-dependencies.dev = [ "anndata", "pre-commit", "twine>=4.0.2" ]
 optional-dependencies.doc = [
   "docutils>=0.8,!=0.18.*,!=0.19.*",
   "formulaic>=1.1.1",
@@ -54,13 +48,8 @@ optional-dependencies.doc = [
   "sphinxext-opengraph",
   "statsmodels",
 ]
-optional-dependencies.stats = [
-  
-]
-optional-dependencies.test = [
-  "coverage",
-  "pytest",
-]
+optional-dependencies.stats = [  ]
+optional-dependencies.test = [ "coverage", "pytest" ]
 # https://docs.pypi.org/project_metadata/#project-urls
 urls.Documentation = "https://deres.readthedocs.io/"
 urls.Homepage = "https://github.com/scverse/deres"
@@ -131,9 +120,7 @@ addopts = [
 
 [tool.coverage.run]
 source = [ "deres" ]
-omit = [
-  "**/test_*.py",
-]
+omit = [ "**/test_*.py" ]
 
 [tool.cruft]
 skip = [
